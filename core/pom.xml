@@ -7,6 +7,12 @@
 	<name>core</name>
 	<url>http://maven.apache.org</url>
 
+	<parent>
+		<groupId>org.genrat</groupId>
+		<artifactId>genrat-parent</artifactId>
+		<version>0.0.1-SNAPSHOT</version>
+	</parent>
+	
 	<properties>
 		<maven.compiler.source>1.8</maven.compiler.source>
 		<maven.compiler.target>1.8</maven.compiler.target>

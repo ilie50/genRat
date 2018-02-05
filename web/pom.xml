@@ -7,14 +7,22 @@
 	<artifactId>web</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 
-    <parent>
+	<parent>
+		<groupId>org.genrat</groupId>
+		<artifactId>genrat-parent</artifactId>
+		<version>0.0.1-SNAPSHOT</version>
+	</parent>
+
+	
+    <!--parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
         <version>1.5.9.RELEASE</version>
-    </parent>
+    </parent-->
 
     <properties>
         <java.version>1.8</java.version>
+        <spring-boot.version>1.5.9.RELEASE</spring-boot.version>
     </properties>
 
     <build>
@@ -22,6 +30,7 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+                <version>${spring-boot.version}</version>
             </plugin>
         </plugins>
     </build>
@@ -30,6 +39,7 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
+            <version>${spring-boot.version}</version>
         </dependency>
     </dependencies>
 
