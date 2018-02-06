@@ -12,6 +12,7 @@ import java.util.stream.Collectors;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
 import org.apache.xmlbeans.XmlCursor;
+import org.genrat.core.GeneratorService;
 import org.genrat.core.Main;
 
 public class DocParagraph {
@@ -23,7 +24,7 @@ public class DocParagraph {
 		Files.copy(new File(Main.DOCX_INPUT_PATH).toPath(), new File(Main.DOCX_INPUT_PATH + "_temp").toPath(),
 				StandardCopyOption.REPLACE_EXISTING);
 		// Blank Document
-		try (XWPFDocument document = new Main().loadDocxIntoXWPFDocument(Main.DOCX_INPUT_PATH + "_temp")) {
+		try (XWPFDocument document = new GeneratorService().loadDocxIntoXWPFDocument(Main.DOCX_INPUT_PATH + "_temp")) {
 			// Write the Document in file system
 			FileOutputStream out = new FileOutputStream(new File(DOCX_OUTPUT_PATH));
 			// FileOutputStream out = new FileOutputStream(new File(Main.DOCX_INPUT_PATH +
@@ -62,7 +63,7 @@ public class DocParagraph {
 			Files.copy(new File(workingFilePath).toPath(), new File(Main.DOCX_INPUT_PATH + "_temp").toPath(),
 					StandardCopyOption.REPLACE_EXISTING);
 			// Blank Document
-			try (XWPFDocument document = new Main().loadDocxIntoXWPFDocument(Main.DOCX_INPUT_PATH + "_temp")) {
+			try (XWPFDocument document = new GeneratorService().loadDocxIntoXWPFDocument(Main.DOCX_INPUT_PATH + "_temp")) {
 				// Write the Document in file system
 				FileOutputStream out = new FileOutputStream(new File(DOCX_OUTPUT_PATH));
 
