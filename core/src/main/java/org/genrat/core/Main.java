@@ -11,13 +11,13 @@ import org.apache.poi.xwpf.usermodel.XWPFDocument;
 
 public class Main {
 
-	public static final String DOCX_INPUT_PATH = "C:\\tmp\\gr\\RemoteDebugginSetup.docx";
+//	public static final String DOCX_INPUT_PATH = "C:\\tmp\\gr\\RemoteDebugginSetup.docx";
+	public static final String DOCX_INPUT_PATH = "C:\\Users\\ibratilescu\\Documents\\TestDocument.docx";
 	public static final String PDF_OUTPUT_PATH = "C:\\tmp\\gr\\pdf\\";
 
 	public static void main(String[] args) {
 		GeneratorService gs = new GeneratorService();
-		String xml = "<name>Name</name>";
-		gs.createPDF(DOCX_INPUT_PATH, PDF_OUTPUT_PATH, xml);
+		gs.createPdf(DOCX_INPUT_PATH, PDF_OUTPUT_PATH);
 		//main.updateWorkingDoc(DOCX_INPUT_PATH, PDF_OUTPUT_PATH, xml);
 		//main.readDoc(fileInputPath);
 	}

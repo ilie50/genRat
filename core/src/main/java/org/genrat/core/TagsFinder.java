@@ -7,6 +7,7 @@ import java.util.regex.Pattern;
 
 import org.apache.commons.lang.StringUtils;
 import org.genrat.fm.FreeMarkerGenrateXMLFromObject;
+import org.genrat.tags.Tag;
 
 public class TagsFinder {
 
@@ -58,13 +59,15 @@ public class TagsFinder {
 	}
 
 
-	public List<String> getTagValues(final String str) {
-	    final List<String> tagValues = new ArrayList<>();
+	public List<Tag> getTagValues(final String str) {
+	    final List<Tag> tags = new ArrayList<>();
 	    final Matcher matcher = Pattern.compile(TAG_REGEX).matcher(str);
 	    while (matcher.find()) {
-	        tagValues.add(matcher.group(0));
+	    	int start = matcher.start();
+			int end = matcher.end();
+			tags.add(new Tag(matcher.group(0), start, end));
 	    }
-	    return tagValues;
+	    return tags;
 	}
 	
 	public String getContent(String patternText, String text) {
@@ -108,12 +111,12 @@ public class TagsFinder {
 		System.out.println(matcher4.group(0));
 		
 		
-		List<String> tagValues = new TagsFinder().getTagValues("Text1 ${name} dfddas ${newName} fgsdf <#list personDetails as person> sdfadf dd ${person.name} dfdfgsdf dfsf ${person.location} sdfdf sdfsdf </#list>");
+		List<Tag> tagValues = new TagsFinder().getTagValues("Text1 ${name} dfddas ${newName} fgsdf <#list personDetails as person> sdfadf dd ${person.name} dfdfgsdf dfsf ${person.location} sdfdf sdfsdf </#list>");
 		tagValues.forEach(s -> {
-			System.out.println(s);
+			System.out.println(s.getValue());
 		});
 		
-		String process = new FreeMarkerGenrateXMLFromObject().process(tagValues.stream().reduce((s1, s2) -> s1 + "\n" + s2).get());
+		String process = new FreeMarkerGenrateXMLFromObject().process(tagValues.stream().map(tag -> tag.getValue()).reduce((s1, s2) -> s1 + "\n" + s2).get());
 		System.out.println(process);
 	}
 

@@ -2,11 +2,11 @@ package org.genrat.core;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.nio.file.Files;
 import java.util.UUID;
 
 import org.apache.poi.openxml4j.exceptions.InvalidFormatException;
@@ -43,52 +43,19 @@ public class GeneratorService {
 
 	}
 
-	public void createPdf(String templateInputPath, String pdfOutputPath) {
-		String xml = "<name>Name</name>";
-		createPDF(templateInputPath, pdfOutputPath, xml);
+	public void createPdf(String templateInputPath, String outputFolderPath) {
 
-	}
-	
-	public void createPDF(String templateInputPath, String outputFolderPath, String xmlData) {
-
-		
-		String workingFilePath = createDocWorkingCopy(templateInputPath, outputFolderPath);
-
-		// 1) Load DOCX into XWPFDocument
-		try (XWPFDocument document = loadDocxIntoXWPFDocument(workingFilePath)) {
-
-			// 2) Bind XML data into XWPFDocument
-			DocProcessor docProcessor = bindXMLDataIntoXWPFDocument(document);
-			processXWPFDocument(docProcessor);
-			// 3) Prepare Pdf options
-			PdfOptions options = preparePdfOptions();
-			
-			// 3) Convert XWPFDocument to Pdf
-			convertXWPFDocumentToPdf(docProcessor.getDocument(), options, workingFilePath + ".pdf");
-
+		ByteArrayOutputStream byteArrayOutputStream;
+		try (FileInputStream fis = new FileInputStream(new File(templateInputPath))) {
+			byteArrayOutputStream = createPdf(fis);
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		}
-		deleteWorkingFile(workingFilePath);
-
-	}
-
-	private void deleteWorkingFile(String workingFilePath) {
-		try {
-			Files.delete(new File(workingFilePath).toPath());
+		try(OutputStream outputStream = new FileOutputStream(outputFolderPath + UUID.randomUUID().toString() + ".pdf")) {
+		    byteArrayOutputStream.writeTo(outputStream);
 		} catch (IOException e) {
 			throw new RuntimeException(e);
-		}		
-	}
-
-	private String createDocWorkingCopy(String templateInputPath, String outputFolderPath) {
-		String fileOutputPath = outputFolderPath + File.separator + UUID.randomUUID().toString();
-		try {
-			Files.copy(new File(templateInputPath).toPath(), new File(fileOutputPath).toPath());
-		} catch (IOException e) {
-			throw new RuntimeException(e);
-		}
-		return fileOutputPath;
+		} 
 	}
 
 	private DocProcessor bindXMLDataIntoXWPFDocument(XWPFDocument document) {
@@ -117,20 +84,6 @@ public class GeneratorService {
 				"Generate pdf with " + (System.currentTimeMillis() - start) + "ms");
 	}
 
-	private void convertXWPFDocumentToPdf(XWPFDocument document, PdfOptions options, String fileOutputPath) {
-		long start = System.currentTimeMillis();
-
-		File fileOutput = new File(fileOutputPath);
-		try (OutputStream out = new FileOutputStream(fileOutput)) {
-			PdfConverter.getInstance().convert(document, out, options);
-		} catch (IOException e) {
-			throw new RuntimeException(e);
-		}
-
-		System.err.println(
-				"Generate " + fileOutput.getAbsolutePath() + " with " + (System.currentTimeMillis() - start) + "ms");
-	}
-
 	public XWPFDocument loadDocxIntoXWPFDocument(String fileInputPath) {
 		try {
 			return new XWPFDocument(OPCPackage.open(fileInputPath));
@@ -146,6 +99,4 @@ public class GeneratorService {
 			throw new RuntimeException(e);
 		}
 	}
-
-
 }

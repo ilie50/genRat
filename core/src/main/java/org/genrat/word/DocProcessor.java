@@ -3,6 +3,7 @@ package org.genrat.word;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -22,6 +23,7 @@ import org.apache.poi.xwpf.usermodel.XWPFTableRow;
 import org.apache.xmlbeans.XmlCursor;
 import org.genrat.core.TagsFinder;
 import org.genrat.fm.FreeMarkerGenrateXMLFromObject;
+import org.genrat.tags.Tag;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTPPr;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTRPr;
 
@@ -32,7 +34,7 @@ public class DocProcessor {
 	private XWPFDocument document;
 	private StringBuilder template = new StringBuilder();
 	
-	private Map<UUID, Map<UUID, String>> allMap = new LinkedHashMap<>();
+	private Map<UUID, Map<UUID, Tag>> allMap = new LinkedHashMap<>();
 	private Map<UUID, Paragraph> paragraphMap = new LinkedHashMap<>();
 	private Stack<UUID> stack = new Stack<>();
 	
@@ -74,7 +76,7 @@ public class DocProcessor {
 		for (String item : list) {
 			UUID paragraphUuid = getUUID(item.substring(0, uuidLength));
 			String paragraphText = item.substring(uuidLength);
-			Map<UUID, String> map = allMap.get(paragraphUuid);
+			Map<UUID, Tag> map = allMap.get(paragraphUuid);
 			if (map == null) {
 				continue;
 			}
@@ -85,54 +87,52 @@ public class DocProcessor {
 			posOfParagraph = document.getPosOfParagraph(newParagraph);
 			XWPFParagraph xwpfParagraph = paragraph.getParagraph();
 			cloneParagraph(newParagraph, xwpfParagraph);
-			
-			int indexDiff = 0;
-			for (Entry<UUID, String> entry : map.entrySet()) {
+			for (Entry<UUID, Tag> entry : map.entrySet()) {
 				String convertedText = tagFinder.getContent(entry.getKey().toString(), paragraphText);
-				String originalValue = entry.getValue();
-				Map<UUID, XWPFRun> runMap = paragraphRunMap.get(paragraphUuid);
-				List<XWPFRun> runs = new ArrayList<>();
-				for (Entry<UUID, XWPFRun> runEntry : runMap.entrySet()) {
-					if (originalValue.contains(runEntry.getKey().toString())) {
-						runs.add(runEntry.getValue());
+				String originalValue = entry.getValue().getContent();
+				List<Run> runs = findCurrentRuns(entry.getValue(), paragraphUuid);
+				String runText = "";
+				XWPFRun firstXwpfRun = null;
+				for (Run run : runs) {
+					XWPFRun newXwpfRun = newParagraph.getRuns().get(run.getPosition());
+					runText += newXwpfRun.getText(0);
+					if (firstXwpfRun == null) {
+						firstXwpfRun = newXwpfRun;
 					}
+					newXwpfRun.setText("", 0);
 				}
-				if (!runs.isEmpty()) {
-					List<XWPFRun> paragraphRuns = xwpfParagraph.getRuns();
-					boolean alreadyInserted = false;
-					int index = 0; 
-					int i = 0;
-					for (i = 0; i < paragraphRuns.size(); i++) {
-						XWPFRun run = paragraphRuns.get(i);
-						if (runs.contains(run)) {
-							if (!alreadyInserted) {
-								index -= indexDiff;
-							}
-							newParagraph.removeRun(index);
-							index--;
-							if (!alreadyInserted) {
-								index++;
-								XWPFRun nr = null;
-								if (index >= newParagraph.getRuns().size()) {
-									nr = newParagraph.createRun();
-								} else {
-									nr = newParagraph.insertNewRun(index);
-									
-								}
-								cloneRun(nr, runs.get(0), convertedText);
-								alreadyInserted = true;
-							}
-						}
-						
-						index++;
-					}
-					indexDiff = i - index;
+				if (firstXwpfRun != null) {
+					firstXwpfRun.setText(runText.replace(originalValue, convertedText), 0);
 				}
 			}
 		}
 		for (Paragraph paragraph : paragraphMap.values()) {
 			document.removeBodyElement(document.getPosOfParagraph(paragraph.getParagraph()));
 		}
+	}
+
+	private List<Run> findCurrentRuns(Tag tag, UUID paragraphUuid) {
+		List<Run> list = paragraphRunList.get(paragraphUuid);
+		Set<Run> result = new LinkedHashSet<>();
+		if (list == null) {
+			return new ArrayList<>(result);
+		}
+		int tagStart = tag.getStart();
+		int tagEnd = tagStart + tag.getContent().length();
+		for (Run run : list) {
+			int runStart = run.getStart();
+			int runEnd = run.getEnd();
+			if (runStart >= tagStart && runEnd <= tagEnd) {
+				result.add(run);
+			} else if (runStart <= tagStart && runEnd <= tagEnd && runEnd > tagStart) {
+				result.add(run);
+			} else if (tagStart <= runStart && tagEnd <= runEnd && tagEnd > runStart) {
+				result.add(run);
+			} else if (runStart <= tagStart && tagEnd <= runEnd) {
+				result.add(run);
+			}
+		}
+		return new ArrayList<>(result);
 	}
 
 	private XmlCursor findCursor(UUID paragraphUuid, UUID groupId, List<String> list, String item, int uuidLength, int posOfParagraph) {
@@ -176,21 +176,24 @@ public class DocProcessor {
 			}
 		}
 	}
-	private Map<UUID, Map<UUID, XWPFRun>> paragraphRunMap = new LinkedHashMap<>();
+	private Map<UUID, List<Run>> paragraphRunList = new LinkedHashMap<>();
 	
 	private void processParagraph(XWPFParagraph paragraph) {
-		Map<UUID, String> map = new LinkedHashMap<>();
+		Map<UUID, Tag> map = new LinkedHashMap<>();
 		List<XWPFRun> runs = paragraph.getRuns();
-		StringBuilder sbRuns = new StringBuilder();
-		Map<UUID, XWPFRun> runMap = new LinkedHashMap<>();
+		List<Run> runList = new ArrayList<>();
+		String builtText = "";
+		int position = 0;
 		for (XWPFRun run : runs) {
-			UUID uuid = UUID.randomUUID();
-			runMap.put(uuid, run);
-			sbRuns.append(run.getText(0)).append(uuid.toString());
+			
+			String runText = run.getText(0);
+			int start = builtText.length();
+			runList.add(new Run(run, start, start + runText.length(), position++));
+			builtText += runText;
 		}
 		UUID paragraphUuid = UUID.randomUUID();
-		paragraphRunMap.put(paragraphUuid, runMap);
-		String text = sbRuns.toString();//paragraph.getText();
+		paragraphRunList.put(paragraphUuid, runList);
+		String text = /*sbRuns.toString();*/paragraph.getText();
 		String delimiter = "";
 		if (!template.toString().isEmpty()) {
 			delimiter = DELIMITER;
@@ -205,21 +208,21 @@ public class DocProcessor {
 			inTagCounter--;
 		}
 		if (tagFinder.isTag(text) || inTagCounter > 0) {
-			List<String> tags = tagFinder.getTagValues(text);
+			List<Tag> tags = tagFinder.getTagValues(text);
 			template.append(delimiter);
 			template.append(paragraphUuid);
 			for (int i = 0; i < tags.size(); i++) {
-				String tag = tags.get(i);
+				Tag tag = tags.get(i);
 				UUID tagUuid = UUID.randomUUID();
-				int startIndex = text.indexOf(tag);
+				int startIndex = text.indexOf(tag.getValue());
 				int endIndex = text.length();
 				if (i < tags.size() - 1) {
-					endIndex = text.indexOf(tags.get(i + 1), startIndex);
+					endIndex = text.indexOf(tags.get(i + 1).getValue(), startIndex);
 				}
 				String tagContent = text.substring(startIndex, endIndex);
-				map.put(tagUuid, tagContent);
-				String cleanTagContent = removeRunUuidFromTagContent(tagContent, runMap.keySet());
-				template.append(tagUuid + cleanTagContent + tagUuid);			
+				tag.setContent(tagContent);
+				map.put(tagUuid, tag);
+				template.append(tagUuid + tagContent + tagUuid);			
 				text = text.substring(startIndex + tagContent.length());
 			}
 			allMap.put(paragraphUuid, map);
@@ -228,13 +231,6 @@ public class DocProcessor {
 		if (tagFinder.isDirectiveStartTag(text) && tagFinder.isDirectiveEndTag(text)) {
 			stack.pop();
 		}
-	}
-
-	private String removeRunUuidFromTagContent(String tagContent, Set<UUID> uuids) {
-		for (UUID uuid : uuids) {
-			tagContent = tagContent.replace(uuid.toString(), "");
-		}
-		return tagContent;
 	}
 
 	private UUID getUUID(String sUuid) {
