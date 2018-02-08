@@ -1,5 +1,6 @@
 package org.genrat.word;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -21,9 +22,11 @@ import org.apache.poi.xwpf.usermodel.XWPFTable;
 import org.apache.poi.xwpf.usermodel.XWPFTableCell;
 import org.apache.poi.xwpf.usermodel.XWPFTableRow;
 import org.apache.xmlbeans.XmlCursor;
-import org.genrat.core.TagsFinder;
-import org.genrat.fm.FreeMarkerGenrateXMLFromObject;
-import org.genrat.tags.Tag;
+import org.genrat.fm.FreeMarkerProcessService;
+import org.genrat.tags.TagsFinder;
+import org.genrat.tags.model.Tag;
+import org.genrat.word.model.Paragraph;
+import org.genrat.word.model.Run;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTPPr;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTRPr;
 
@@ -42,7 +45,7 @@ public class DocProcessor {
 	
 
 	private TagsFinder tagFinder = new TagsFinder();
-	private FreeMarkerGenrateXMLFromObject freeMarker = new FreeMarkerGenrateXMLFromObject();
+	private FreeMarkerProcessService freeMarker = new FreeMarkerProcessService();
 
 
 	public DocProcessor(XWPFDocument document) {
@@ -66,8 +69,8 @@ public class DocProcessor {
 	}
 
 
-	public void applyData() {
-		List<String> list = processTemplate();
+	public void applyData(Serializable data) {
+		List<String> list = processTemplate(data);
 		int uuidLength = UUID.randomUUID().toString().length();
 		if (paragraphMap.isEmpty()) {
 			return;
@@ -83,7 +86,7 @@ public class DocProcessor {
 			Paragraph paragraph = paragraphMap.get(paragraphUuid);
 			
 			XmlCursor cursor = findCursor(paragraphUuid, paragraph.getGroupId(), list, item, uuidLength, posOfParagraph);
-			XWPFParagraph newParagraph = new DocParagraph().createParagraph(document, cursor);
+			XWPFParagraph newParagraph = document.insertNewParagraph(cursor);
 			posOfParagraph = document.getPosOfParagraph(newParagraph);
 			XWPFParagraph xwpfParagraph = paragraph.getParagraph();
 			cloneParagraph(newParagraph, xwpfParagraph);
@@ -151,8 +154,8 @@ public class DocProcessor {
 		return nextParagraph.getParagraph().getCTP().newCursor();
 	}
 
-	private List<String> processTemplate() {
-		String result = freeMarker.process(template.toString());
+	private List<String> processTemplate(Serializable data) {
+		String result = freeMarker.process(template.toString(), data);
 		List<String> list = Arrays.asList(result.split(DELIMITER));
 		return list;
 

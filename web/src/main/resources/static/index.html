@@ -1,10 +1,15 @@
 <html>
 <body>
-	<form method="POST" enctype="multipart/form-data"
-		action="/upload">
-		File to upload: <input type="file" name="file"><br /> Name: <input
-			type="text" name="name"><br /> <br /> <input type="submit"
-			value="Upload"> Press here to upload the file!
+	<form method="POST" enctype="multipart/form-data" action="/upload">
+		File to upload: <input type="file" name="file"/>
+		<br /> <br /> Name: <input type="text" name="name"/>
+		<br /> <br /> Data type: <select name="dataType">
+			<option value="xml">XML</option>
+			<option value="json">JSON</option>
+		</select>
+		<br /> <br /> Data: <textarea name="data" rows="10" cols="50"></textarea>
+		<br /> <br /> 
+		<input type="submit"value="Upload"/> Press here to upload the file!
 	</form>
 </body>
 </html>

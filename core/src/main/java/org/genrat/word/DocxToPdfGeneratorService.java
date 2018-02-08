@@ -1,13 +1,10 @@
-package org.genrat.core;
+package org.genrat.word;
 
 import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.UUID;
+import java.io.Serializable;
 
 import org.apache.poi.openxml4j.exceptions.InvalidFormatException;
 import org.apache.poi.openxml4j.opc.OPCPackage;
@@ -15,21 +12,21 @@ import org.apache.poi.xwpf.converter.core.XWPFConverterException;
 import org.apache.poi.xwpf.converter.pdf.PdfConverter;
 import org.apache.poi.xwpf.converter.pdf.PdfOptions;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
-import org.genrat.word.DocProcessor;
+import org.genrat.core.IGeneratorService;
 import org.springframework.stereotype.Service;
 
 @Service
-public class GeneratorService {
+public class DocxToPdfGeneratorService implements IGeneratorService {
 
 	
-	public ByteArrayOutputStream createPdf(InputStream templateInput) {
+	public ByteArrayOutputStream createPdf(InputStream templateInput, Serializable data) {
 		// 1) Load DOCX into XWPFDocument
 		try (XWPFDocument document = loadDocxIntoXWPFDocument(templateInput);
 				ByteArrayOutputStream out = new ByteArrayOutputStream()) {
 
 			// 2) Bind XML data into XWPFDocument
 			DocProcessor docProcessor = bindXMLDataIntoXWPFDocument(document);
-			processXWPFDocument(docProcessor);
+			processXWPFDocument(docProcessor, data);
 			// 3) Prepare Pdf options
 			PdfOptions options = preparePdfOptions();
 			
@@ -43,29 +40,17 @@ public class GeneratorService {
 
 	}
 
-	public void createPdf(String templateInputPath, String outputFolderPath) {
-
-		ByteArrayOutputStream byteArrayOutputStream;
-		try (FileInputStream fis = new FileInputStream(new File(templateInputPath))) {
-			byteArrayOutputStream = createPdf(fis);
-		} catch (IOException e) {
-			throw new RuntimeException(e);
-		}
-		try(OutputStream outputStream = new FileOutputStream(outputFolderPath + UUID.randomUUID().toString() + ".pdf")) {
-		    byteArrayOutputStream.writeTo(outputStream);
-		} catch (IOException e) {
-			throw new RuntimeException(e);
-		} 
-	}
-
 	private DocProcessor bindXMLDataIntoXWPFDocument(XWPFDocument document) {
+		long start = System.currentTimeMillis();		
 		DocProcessor docProcessor = new DocProcessor(document);
 		docProcessor.wordDocProcessor();
+		System.err.println(
+				"Bind data to doc in " + (System.currentTimeMillis() - start) + "ms");
 		return docProcessor;
 	}
 
-	private void processXWPFDocument(DocProcessor docProcessor) {
-		docProcessor.applyData();
+	private void processXWPFDocument(DocProcessor docProcessor, Serializable data) {
+		docProcessor.applyData(data);
 	}
 
 	private PdfOptions preparePdfOptions() {
@@ -81,22 +66,21 @@ public class GeneratorService {
 		}
 
 		System.err.println(
-				"Generate pdf with " + (System.currentTimeMillis() - start) + "ms");
+				"Generate pdf in " + (System.currentTimeMillis() - start) + "ms");
 	}
 
-	public XWPFDocument loadDocxIntoXWPFDocument(String fileInputPath) {
-		try {
-			return new XWPFDocument(OPCPackage.open(fileInputPath));
-		} catch (InvalidFormatException | IOException e) {
-			throw new RuntimeException(e);
-		}
-	}
 
-	public XWPFDocument loadDocxIntoXWPFDocument(InputStream input) {
+	private XWPFDocument loadDocxIntoXWPFDocument(InputStream input) {
+		long start = System.currentTimeMillis();
 		try {
 			return new XWPFDocument(OPCPackage.open(input));
 		} catch (InvalidFormatException | IOException e) {
 			throw new RuntimeException(e);
+		} finally {
+			System.err.println(
+					"Load docx by poi in " + (System.currentTimeMillis() - start) + "ms");
+
 		}
 	}
+
 }

@@ -1,13 +1,19 @@
 package org.genrat.core;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.util.UUID;
 
 import org.apache.poi.hwpf.HWPFDocument;
 import org.apache.poi.hwpf.extractor.WordExtractor;
 import org.apache.poi.xwpf.extractor.XWPFWordExtractor;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
+import org.genrat.fm.FreeMarkerTemplateData;
+import org.genrat.word.DocxToPdfGeneratorService;
 
 public class Main {
 
@@ -16,11 +22,29 @@ public class Main {
 	public static final String PDF_OUTPUT_PATH = "C:\\tmp\\gr\\pdf\\";
 
 	public static void main(String[] args) {
-		GeneratorService gs = new GeneratorService();
-		gs.createPdf(DOCX_INPUT_PATH, PDF_OUTPUT_PATH);
+		long start = System.currentTimeMillis();
+		new Main().createPdf(DOCX_INPUT_PATH, PDF_OUTPUT_PATH);
 		//main.updateWorkingDoc(DOCX_INPUT_PATH, PDF_OUTPUT_PATH, xml);
 		//main.readDoc(fileInputPath);
+		System.err.println(
+				"Total time " + (System.currentTimeMillis() - start) + "ms");
 	}
+
+	public void createPdf(String templateInputPath, String outputFolderPath) {
+
+		ByteArrayOutputStream byteArrayOutputStream;
+		try (FileInputStream fis = new FileInputStream(new File(templateInputPath))) {
+			byteArrayOutputStream = new DocxToPdfGeneratorService().createPdf(fis, new FreeMarkerTemplateData().getTemplateData());
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		}
+		try(OutputStream outputStream = new FileOutputStream(outputFolderPath + UUID.randomUUID().toString() + ".pdf")) {
+		    byteArrayOutputStream.writeTo(outputStream);
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		} 
+	}
+
 
 	private boolean isDocxFile(String filePath) {
 		return filePath.substring(filePath.length() - 1).equals("x");

@@ -9,13 +9,14 @@ import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.apache.poi.openxml4j.exceptions.InvalidFormatException;
+import org.apache.poi.openxml4j.opc.OPCPackage;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
 import org.apache.xmlbeans.XmlCursor;
-import org.genrat.core.GeneratorService;
 import org.genrat.core.Main;
 
-public class DocParagraph {
+public class DocParagraphTest {
 
 	public static final String DOCX_OUTPUT_PATH = "C:\\tmp\\gr\\RemoteDebugginSetup_copy.docx";
 
@@ -24,14 +25,14 @@ public class DocParagraph {
 		Files.copy(new File(Main.DOCX_INPUT_PATH).toPath(), new File(Main.DOCX_INPUT_PATH + "_temp").toPath(),
 				StandardCopyOption.REPLACE_EXISTING);
 		// Blank Document
-		try (XWPFDocument document = new GeneratorService().loadDocxIntoXWPFDocument(Main.DOCX_INPUT_PATH + "_temp")) {
+		try (XWPFDocument document = new DocParagraphTest().loadDocxIntoXWPFDocument(Main.DOCX_INPUT_PATH + "_temp")) {
 			// Write the Document in file system
 			FileOutputStream out = new FileOutputStream(new File(DOCX_OUTPUT_PATH));
 			// FileOutputStream out = new FileOutputStream(new File(Main.DOCX_INPUT_PATH +
 			// "_temp"));
 
 			String[] paragraphs = new String[] { "ABCD", "EFGH", "IJKL" };
-			new DocParagraph().createParagraphs(document.getParagraphs().iterator().next(), paragraphs);
+			new DocParagraphTest().createParagraphs(document.getParagraphs().iterator().next(), paragraphs);
 			// create Paragraph
 			/*
 			 * XWPFParagraph paragraph = document.createParagraph(); XWPFRun run =
@@ -55,7 +56,7 @@ public class DocParagraph {
 	public void createParagraph(XWPFDocument document, String uuid, String newText) {
 		List<XWPFParagraph> ps = document.getParagraphs().stream().filter(p -> p.getText().contains(uuid))
 				.collect(Collectors.toList());
-		new DocParagraph().createParagraphs(ps.iterator().next(), newText);
+		new DocParagraphTest().createParagraphs(ps.iterator().next(), newText);
 	}
 
 	public void createParagraph(String workingFilePath, String uuid, String newText) {
@@ -63,13 +64,13 @@ public class DocParagraph {
 			Files.copy(new File(workingFilePath).toPath(), new File(Main.DOCX_INPUT_PATH + "_temp").toPath(),
 					StandardCopyOption.REPLACE_EXISTING);
 			// Blank Document
-			try (XWPFDocument document = new GeneratorService().loadDocxIntoXWPFDocument(Main.DOCX_INPUT_PATH + "_temp")) {
+			try (XWPFDocument document = new DocParagraphTest().loadDocxIntoXWPFDocument(Main.DOCX_INPUT_PATH + "_temp")) {
 				// Write the Document in file system
 				FileOutputStream out = new FileOutputStream(new File(DOCX_OUTPUT_PATH));
 
 				List<XWPFParagraph> ps = document.getParagraphs().stream().filter(p -> p.getText().contains(uuid))
 						.collect(Collectors.toList());
-				new DocParagraph().createParagraphs(ps.iterator().next(), newText);
+				new DocParagraphTest().createParagraphs(ps.iterator().next(), newText);
 				// create Paragraph
 				/*
 				 * XWPFParagraph paragraph = document.createParagraph(); XWPFRun run =
@@ -92,6 +93,15 @@ public class DocParagraph {
 			throw new RuntimeException();
 		}
 	}
+	
+	protected XWPFDocument loadDocxIntoXWPFDocument(String fileInputPath) {
+		try {
+			return new XWPFDocument(OPCPackage.open(fileInputPath));
+		} catch (InvalidFormatException | IOException e) {
+			throw new RuntimeException(e);
+		}
+	}
+
 	
 	public XWPFParagraph createParagraph(XWPFDocument document/*XWPFParagraph xwpfParagraph*/, XmlCursor cursor) {
 		/*if (xwpfParagraph == null) {

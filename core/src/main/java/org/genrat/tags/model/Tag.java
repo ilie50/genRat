@@ -1,4 +1,4 @@
-package org.genrat.tags;
+package org.genrat.tags.model;
 
 import java.io.Serializable;
 

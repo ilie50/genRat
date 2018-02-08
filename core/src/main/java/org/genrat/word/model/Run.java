@@ -1,4 +1,4 @@
-package org.genrat.word;
+package org.genrat.word.model;
 
 import java.io.Serializable;
 
