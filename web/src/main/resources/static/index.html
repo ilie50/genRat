@@ -9,7 +9,44 @@
 		</select>
 		<br /> <br /> Data: <textarea name="data" rows="10" cols="50"></textarea>
 		<br /> <br /> 
-		<input type="submit"value="Upload"/> Press here to upload the file!
+		<input type="submit" value="Generate"/>
+		<br /> <br /> 
+		<br /> <br />
+		<h2>EXAMPLES:</h2>
+		<br />
+		<a href="/download/TestDocument">Download template example</a>
+		<br /> <br /> 
+		<fieldset>
+		    <legend>XML example:</legend>
+<pre>&lt;name&gt;Java Honk NM&lt;/name&gt;
+&lt;newName&gt;Java Tonk NW&lt;/newName&gt;
+&lt;age&gt;22&lt;/age&gt;
+&lt;personDetails&gt;
+	&lt;name&gt;Java Honk US&lt;/name&gt;
+	&lt;location&gt;USA&lt;/location&gt;
+	&lt;age&gt;23&lt;/age&gt;
+&lt;/personDetails&gt;
+&lt;personDetails&gt;
+	&lt;name&gt;Java Monk FR&lt;/name&gt;
+	&lt;location&gt;France&lt;/location&gt;
+	&lt;age&gt;15&lt;/age&gt;
+&lt;/personDetails&gt;
+&lt;sections&gt;
+	&lt;name&gt;Section 1&lt;/name&gt;
+	&lt;age&gt;17&lt;/age&gt;
+&lt;/sections&gt;
+&lt;sections&gt;
+	&lt;name&gt;Section 2&lt;/name&gt;
+	&lt;age&gt;19&lt;/age&gt;
+&lt;/sections&gt;</pre>
+		</fieldset>  
+		<br /> <br /> 
+		<fieldset>
+		    <legend>JSON example:</legend>
+		    <pre>{"name":"Java Honk NM","newName":"Java Tonk NW","age":22,
+		    	  "personDetails":[{"name":"Java Honk US","location":"USA","age":23},{"name":"Java Monk FR","location":"France","age":15}],
+		    	  "sections":[{"name":"Section 1","age":17},{"name":"Section 2","age":19}]}</pre>
+		</fieldset>  
 	</form>
 </body>
 </html>
