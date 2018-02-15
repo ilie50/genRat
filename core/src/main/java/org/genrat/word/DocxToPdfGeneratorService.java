@@ -12,6 +12,7 @@ import org.apache.poi.xwpf.converter.core.XWPFConverterException;
 import org.apache.poi.xwpf.converter.pdf.PdfConverter;
 import org.apache.poi.xwpf.converter.pdf.PdfOptions;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
+import org.apache.xmlbeans.XmlException;
 import org.genrat.core.IGeneratorService;
 import org.springframework.stereotype.Service;
 
@@ -50,7 +51,11 @@ public class DocxToPdfGeneratorService implements IGeneratorService {
 	}
 
 	private void processXWPFDocument(DocProcessor docProcessor, Serializable data) {
-		docProcessor.applyData(data);
+		try {
+			docProcessor.applyData(data);
+		} catch (XmlException | IOException e) {
+			throw new RuntimeException(e);
+		}
 	}
 
 	private PdfOptions preparePdfOptions() {

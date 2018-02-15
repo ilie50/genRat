@@ -1,5 +1,6 @@
 package org.genrat.word;
 
+import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -22,10 +23,11 @@ import org.apache.poi.xwpf.usermodel.XWPFTable;
 import org.apache.poi.xwpf.usermodel.XWPFTableCell;
 import org.apache.poi.xwpf.usermodel.XWPFTableRow;
 import org.apache.xmlbeans.XmlCursor;
+import org.apache.xmlbeans.XmlException;
 import org.genrat.fm.FreeMarkerProcessService;
 import org.genrat.tags.TagsFinder;
 import org.genrat.tags.model.Tag;
-import org.genrat.word.model.Paragraph;
+import org.genrat.word.model.Element;
 import org.genrat.word.model.Run;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTPPr;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTRPr;
@@ -38,7 +40,7 @@ public class DocProcessor {
 	private StringBuilder template = new StringBuilder();
 	
 	private Map<UUID, Map<UUID, Tag>> allMap = new LinkedHashMap<>();
-	private Map<UUID, Paragraph> paragraphMap = new LinkedHashMap<>();
+	private Map<UUID, Element> elementMap = new LinkedHashMap<>();
 	private Stack<UUID> stack = new Stack<>();
 	
 	private int inTagCounter = 0;
@@ -59,63 +61,106 @@ public class DocProcessor {
 	public void wordDocProcessor() {
 		List<XWPFHeader> headers = document.getHeaderList();
 		for (XWPFHeader header : headers) {
-			processBodyElements(header.getBodyElements());
+			processElements(header.getBodyElements());
 		}
 		List<XWPFFooter> footers = document.getFooterList();
 		for (XWPFFooter footer : footers) {
-			processBodyElements(footer.getBodyElements());
+			processElements(footer.getBodyElements());
 		}
-		processBodyElements(document.getBodyElements());
+		processElements(document.getBodyElements());
 	}
 
 
-	public void applyData(Serializable data) {
+	public void applyData(Serializable data) throws XmlException, IOException {
 		List<String> list = processTemplate(data);
 		int uuidLength = UUID.randomUUID().toString().length();
-		if (paragraphMap.isEmpty()) {
+		if (elementMap.isEmpty()) {
 			return;
 		}
-		int posOfParagraph = 0;
 		for (String item : list) {
-			UUID paragraphUuid = getUUID(item.substring(0, uuidLength));
-			String paragraphText = item.substring(uuidLength);
-			Map<UUID, Tag> map = allMap.get(paragraphUuid);
+			UUID elementUuid = getUUID(item.substring(0, uuidLength));
+			String elementText = item.substring(uuidLength);
+			Map<UUID, Tag> map = allMap.get(elementUuid);
 			if (map == null) {
 				continue;
 			}
-			Paragraph paragraph = paragraphMap.get(paragraphUuid);
-			
-			XmlCursor cursor = findCursor(paragraphUuid, paragraph.getGroupId(), list, item, uuidLength, posOfParagraph);
-			XWPFParagraph newParagraph = document.insertNewParagraph(cursor);
-			posOfParagraph = document.getPosOfParagraph(newParagraph);
-			XWPFParagraph xwpfParagraph = paragraph.getParagraph();
-			cloneParagraph(newParagraph, xwpfParagraph);
+			Element element = elementMap.get(elementUuid);
+			IBodyElement newElement = null;
+			if (element.isParagraph()) {
+				XmlCursor cursor = findCursor(element);
+				XWPFParagraph xwpfParagraph = element.getParagraph();
+				XWPFParagraph newParagraph = document.insertNewParagraph(cursor);
+				cloneParagraph(newParagraph, xwpfParagraph);
+				newElement = newParagraph;
+			} else if (element.isTable()) {
+				XmlCursor cursor = findCursor(element);
+				XWPFTable table = element.getTable();
+				XWPFTable newTable = document.insertNewTbl(cursor);
+				cloneTable(newTable, table);
+				newElement = newTable;
+			}
+			List<XWPFRun> newRuns = getRuns(newElement);
 			for (Entry<UUID, Tag> entry : map.entrySet()) {
-				String convertedText = tagFinder.getContent(entry.getKey().toString(), paragraphText);
+				String convertedText = tagFinder.getContent(entry.getKey().toString(), elementText);
 				String originalValue = entry.getValue().getContent();
-				List<Run> runs = findCurrentRuns(entry.getValue(), paragraphUuid);
-				String runText = "";
-				XWPFRun firstXwpfRun = null;
-				for (Run run : runs) {
-					XWPFRun newXwpfRun = newParagraph.getRuns().get(run.getPosition());
-					runText += newXwpfRun.getText(0);
-					if (firstXwpfRun == null) {
-						firstXwpfRun = newXwpfRun;
+				List<Run> runs = findCurrentRuns(entry.getValue(), elementUuid);
+				if (element.isTable()) {
+					XWPFTable table = element.getTable();
+					List<XWPFTableRow> rows = table.getRows();
+					for (XWPFTableRow row : rows) {
+						List<XWPFTableCell> cells = row.getTableCells();
+						for (XWPFTableCell cell : cells) {
+							List<XWPFParagraph> paragraphs = cell.getParagraphs();
+							for (XWPFParagraph paragraph : paragraphs) {
+								List<XWPFRun> cellRuns = paragraph.getRuns();
+								List<Run> currentRuns = filterCurrentRuns(runs, cellRuns);
+								replaceTextRun(currentRuns, newRuns, originalValue, convertedText);
+							}
+						}
 					}
-					newXwpfRun.setText("", 0);
-				}
-				if (firstXwpfRun != null) {
-					firstXwpfRun.setText(runText.replace(originalValue, convertedText), 0);
+				} else if (element.isParagraph()) {
+					replaceTextRun(runs, newRuns, originalValue, convertedText);
 				}
 			}
 		}
-		for (Paragraph paragraph : paragraphMap.values()) {
-			document.removeBodyElement(document.getPosOfParagraph(paragraph.getParagraph()));
+		for (Element element : elementMap.values()) {
+			if (element.isParagraph()) {
+				document.removeBodyElement(document.getPosOfParagraph(element.getParagraph()));
+			} else if (element.isTable()){
+				document.removeBodyElement(document.getPosOfTable(element.getTable()));
+			}
 		}
 	}
 
-	private List<Run> findCurrentRuns(Tag tag, UUID paragraphUuid) {
-		List<Run> list = paragraphRunList.get(paragraphUuid);
+	private void replaceTextRun(List<Run> runs, List<XWPFRun> newRuns, String originalValue, String convertedText) {
+		String runText = "";
+		XWPFRun firstXwpfRun = null;
+		for (Run run : runs) {
+			XWPFRun newXwpfRun = newRuns.get(run.getPosition());
+			runText += newXwpfRun.getText(0);
+			if (firstXwpfRun == null) {
+				firstXwpfRun = newXwpfRun;
+			}
+			newXwpfRun.setText("", 0);
+		}
+		if (firstXwpfRun != null) {
+			firstXwpfRun.setText(runText.replace(originalValue, convertedText), 0);
+		}
+
+	}
+	
+	private List<Run> filterCurrentRuns(List<Run> runs, List<XWPFRun> cellRuns) {
+		List<Run> currentRuns = new ArrayList<>();
+		for (Run run : runs) {
+			if (cellRuns.contains(run.getRun())) {
+				currentRuns.add(run);
+			}
+		}
+		return currentRuns;
+	}
+
+	private List<Run> findCurrentRuns(Tag tag, UUID elementUuid) {
+		List<Run> list = elementRunList.get(elementUuid);
 		Set<Run> result = new LinkedHashSet<>();
 		if (list == null) {
 			return new ArrayList<>(result);
@@ -138,20 +183,32 @@ public class DocProcessor {
 		return new ArrayList<>(result);
 	}
 
-	private XmlCursor findCursor(UUID paragraphUuid, UUID groupId, List<String> list, String item, int uuidLength, int posOfParagraph) {
+	private XmlCursor findCursor(Element currentElement) {
+		UUID groupId = currentElement.getGroupId();
+		XmlCursor cursor = null;
 		if (groupId == null) {
-			return paragraphMap.get(paragraphUuid).getParagraph().getCTP().newCursor();			
+			if (currentElement.isParagraph()) {
+				cursor = currentElement.getParagraph().getCTP().newCursor();			
+			} else if (currentElement.isTable()) {
+				cursor = currentElement.getTable().getCTTbl().newCursor();
+			}
+			return cursor;
 		}
 		boolean found = false;
-		Paragraph nextParagraph = null;
-		for (Paragraph paragraph : paragraphMap.values()) {
-			if (groupId.equals(paragraph.getGroupId())) {
+		Element nextElement = null;
+		for (Element element : elementMap.values()) {
+			if (groupId.equals(element.getGroupId())) {
 				found = true;
 			} else if (found) {
-				nextParagraph = paragraph;
+				nextElement = element;
 			}
 		}
-		return nextParagraph.getParagraph().getCTP().newCursor();
+		if (nextElement.isParagraph()) {
+			cursor = nextElement.getParagraph().getCTP().newCursor();			
+		} else if (nextElement.isTable()) {
+			cursor = nextElement.getTable().getCTTbl().newCursor();
+		}
+		return cursor;
 	}
 
 	private List<String> processTemplate(Serializable data) {
@@ -161,26 +218,86 @@ public class DocProcessor {
 
 	}
 
-	private void processBodyElements(List<IBodyElement> bodyElements) {
-		for (IBodyElement element : bodyElements) {
-			if (element instanceof XWPFParagraph) {
-				XWPFParagraph paragraph = (XWPFParagraph) element;
-				processParagraph(paragraph);
+	private void processElements(List<IBodyElement> elements) {
+		for (IBodyElement element : elements) {
+			processElement(element);
+		}
+	}
+	
+	private void processElement(IBodyElement element) {
+		Map<UUID, Tag> map = new LinkedHashMap<>();
+		List<XWPFRun> runs = getRuns(element);
+		List<Run> runList = new ArrayList<>();
+		String builtText = "";
+		int position = 0;
+		for (XWPFRun run : runs) {
+			String runText = run.getText(0);
+			int start = builtText.length();
+			runList.add(new Run(run, start, start + runText.length(), position++));
+			builtText += runText;
+		}
+		UUID elementUuid = UUID.randomUUID();
+		elementRunList.put(elementUuid, runList);
+		String text = getText(element);
+		String delimiter = "";
+		if (!template.toString().isEmpty()) {
+			delimiter = DELIMITER;
+		}
+		if (tagFinder.isDirectiveStartTag(text) && tagFinder.isDirectiveEndTag(text)) {
+			stack.push(elementUuid);
+		} else if (tagFinder.isDirectiveStartTag(text)) {
+			inTagCounter++;
+			stack.push(elementUuid);
+		} else if (tagFinder.isDirectiveEndTag(text)) {
+			stack.pop();
+			inTagCounter--;
+		}
+		if (tagFinder.isTag(text) || inTagCounter > 0) {
+			List<Tag> tags = tagFinder.getTagValues(text);
+			template.append(delimiter);
+			template.append(elementUuid);
+			for (int i = 0; i < tags.size(); i++) {
+				Tag tag = tags.get(i);
+				UUID tagUuid = UUID.randomUUID();
+				int startIndex = text.indexOf(tag.getValue());
+				int endIndex = text.length();
+				if (i < tags.size() - 1) {
+					endIndex = text.indexOf(tags.get(i + 1).getValue(), startIndex);
+				}
+				String tagContent = text.substring(startIndex, endIndex);
+				if (tagFinder.isExpressionTag(tagContent) || tagFinder.isDirectiveEndTag(tagContent)) {
+					tagContent = tagContent.substring(0,  tag.getValue().length());
+				}
+				tag.setContent(tagContent);
+				map.put(tagUuid, tag);
+				template.append(tagUuid + tagContent + tagUuid);			
+				text = text.substring(startIndex + tagContent.length());
 			}
-			if (element instanceof XWPFTable) {
-				XWPFTable table = (XWPFTable) element;
-				List<XWPFTableRow> rows = table.getRows();
-				for (XWPFTableRow row : rows) {
-					List<XWPFTableCell> cells = row.getTableCells();
-					for (XWPFTableCell cell : cells) {
-						processBodyElements(cell.getBodyElements());
-					}
+			allMap.put(elementUuid, map);
+			elementMap.put(elementUuid, new Element(element, stack.isEmpty() ? null : stack.peek()));
+		}
+		if (tagFinder.isDirectiveStartTag(text) && tagFinder.isDirectiveEndTag(text)) {
+			stack.pop();
+		}
+	}
+	
+	/*private void processElement(IBodyElement element) {
+		if (element instanceof XWPFParagraph) {
+			XWPFParagraph paragraph = (XWPFParagraph) element;
+			processParagraph(paragraph);
+		} else if (element instanceof XWPFTable) {
+			XWPFTable table = (XWPFTable) element;
+			List<XWPFTableRow> rows = table.getRows();
+			for (XWPFTableRow row : rows) {
+				List<XWPFTableCell> cells = row.getTableCells();
+				for (XWPFTableCell cell : cells) {
+					processElements(cell.getBodyElements());
 				}
 			}
 		}
+		
 	}
-	private Map<UUID, List<Run>> paragraphRunList = new LinkedHashMap<>();
-	
+
 	private void processParagraph(XWPFParagraph paragraph) {
 		Map<UUID, Tag> map = new LinkedHashMap<>();
 		List<XWPFRun> runs = paragraph.getRuns();
@@ -195,15 +312,15 @@ public class DocProcessor {
 			builtText += runText;
 		}
 		UUID paragraphUuid = UUID.randomUUID();
-		paragraphRunList.put(paragraphUuid, runList);
-		String text = /*sbRuns.toString();*/paragraph.getText();
+		elementRunList.put(paragraphUuid, runList);
+		String text = paragraph.getText();
 		String delimiter = "";
 		if (!template.toString().isEmpty()) {
 			delimiter = DELIMITER;
 		}
 		if (tagFinder.isDirectiveStartTag(text) && tagFinder.isDirectiveEndTag(text)) {
 			stack.push(paragraphUuid);
-		} else if (tagFinder.isDirectiveStartTag(text)/* && !tagFinder.isDirectiveClauseTag(text)*/) {
+		} else if (tagFinder.isDirectiveStartTag(text)) {
 			inTagCounter++;
 			stack.push(paragraphUuid);
 		} else if (tagFinder.isDirectiveEndTag(text)) {
@@ -229,12 +346,67 @@ public class DocProcessor {
 				text = text.substring(startIndex + tagContent.length());
 			}
 			allMap.put(paragraphUuid, map);
-			paragraphMap.put(paragraphUuid, new Paragraph(paragraph, stack.isEmpty() ? null : stack.peek()));
+			elementMap.put(paragraphUuid, new Element(paragraph, stack.isEmpty() ? null : stack.peek()));
 		}
 		if (tagFinder.isDirectiveStartTag(text) && tagFinder.isDirectiveEndTag(text)) {
 			stack.pop();
 		}
+	}*/
+
+	private List<XWPFRun> getRuns(IBodyElement element) {
+		if (element instanceof XWPFParagraph) {
+			XWPFParagraph paragraph = (XWPFParagraph) element;
+			return paragraph.getRuns();
+		}
+		if (element instanceof XWPFTable) {
+			List<XWPFRun> runs = new ArrayList<>();
+			XWPFTable table = (XWPFTable) element;
+			List<XWPFTableRow> rows = table.getRows();
+			for (XWPFTableRow row : rows) {
+				List<XWPFTableCell> cells = row.getTableCells();
+				for (XWPFTableCell cell : cells) {
+					List<IBodyElement> elements = cell.getBodyElements();
+					for (IBodyElement subElement : elements) {
+						List<XWPFRun> subRuns = getRuns(subElement);
+						if (tagFinder.isTag(getText(subElement))) {
+							runs.addAll(subRuns);
+							
+						}
+					}
+				}
+			}
+			return runs;
+		}
+		return null;
 	}
+
+	private String getText(IBodyElement element) {
+		if (element instanceof XWPFParagraph) {
+			XWPFParagraph paragraph = (XWPFParagraph) element;
+			return paragraph.getText();
+		}
+		String text = "";
+		if (element instanceof XWPFTable) {
+			XWPFTable table = (XWPFTable) element;
+			List<XWPFTableRow> rows = table.getRows();
+			for (XWPFTableRow row : rows) {
+				List<XWPFTableCell> cells = row.getTableCells();
+				for (XWPFTableCell cell : cells) {
+					List<IBodyElement> elements = cell.getBodyElements();
+					for (IBodyElement subElement : elements) {
+						String subText = getText(subElement);
+						if (tagFinder.isTag(subText)) {
+							text += subText;
+						}
+					}
+				}
+			}
+			return /*table.getText()*/text;
+		}
+		return null;
+	}
+	private Map<UUID, List<Run>> elementRunList = new LinkedHashMap<>();
+	
 
 	private UUID getUUID(String sUuid) {
 		try {
@@ -262,5 +434,47 @@ public class DocProcessor {
 		CTRPr rPr = clone.getCTR().isSetRPr() ? clone.getCTR().getRPr() : clone.getCTR().addNewRPr();
 		rPr.set(source.getCTR().getRPr());
 		clone.setText(text);
+	}
+	
+	private void cloneTable(XWPFTable clone, XWPFTable source) {
+	    clone.getCTTbl().setTblPr(source.getCTTbl().getTblPr());
+	    clone.getCTTbl().setTblGrid(source.getCTTbl().getTblGrid());
+	    for (int r = 0; r<source.getRows().size(); r++) {
+	        XWPFTableRow targetRow = clone.createRow();
+	        XWPFTableRow row = source.getRows().get(r);
+	        targetRow.getCtRow().setTrPr(row.getCtRow().getTrPr());
+	        for (int c=0; c<row.getTableCells().size(); c++) {
+	            //newly created row has 1 cell
+	            XWPFTableCell targetCell = c==0 ? targetRow.getTableCells().get(0) : targetRow.createCell();
+	            XWPFTableCell cell = row.getTableCells().get(c);
+	            targetCell.getCTTc().setTcPr(cell.getCTTc().getTcPr());
+	            XmlCursor cursor = targetCell.getParagraphArray(targetCell.getParagraphs().size() - 1).getCTP().newCursor();
+	            for (int p = 0; p < cell.getBodyElements().size(); p++) {
+	                IBodyElement elem = cell.getBodyElements().get(p);
+	                if (elem instanceof XWPFParagraph) {
+	                	XWPFParagraph targetPar = null;
+	                	if (p == cell.getBodyElements().size() - 1) {
+	                		targetPar = targetCell.getParagraphArray(p);
+	                	} else {
+							targetPar = targetCell.insertNewParagraph(cursor);
+							cursor.toNextToken();
+						}
+	                    XWPFParagraph par = (XWPFParagraph) elem;
+	                    cloneParagraph(targetPar, par);
+	                } else if (elem instanceof XWPFTable) {
+	                	//newly created cell has one default paragraph we need to remove
+	                	targetCell.removeParagraph(0);
+	                    XWPFTable targetTable = targetCell.insertNewTbl(cursor);
+	                    XWPFTable table = (XWPFTable) elem;
+	                    cloneTable(targetTable, table);
+	                    cursor.toNextToken();
+	                }
+	            }
+	            //newly created cell has one default paragraph we need to remove
+	            //targetCell.removeParagraph(targetCell.getParagraphs().size()-1);
+	        }
+	    }
+	    //newly created table has one row by default. we need to remove the default row.
+	    clone.removeRow(0);
 	}
 }
