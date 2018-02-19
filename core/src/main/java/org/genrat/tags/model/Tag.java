@@ -48,4 +48,9 @@ public class Tag implements Serializable {
 	public void setContent(String content) {
 		this.content = content;
 	}
+
+	@Override
+	public String toString() {
+		return "Tag [value=" + value + ", content=" + content + ", start=" + start + ", end=" + end + "]";
+	}
 }

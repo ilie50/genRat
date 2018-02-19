@@ -57,4 +57,9 @@ public class Element implements Serializable {
 	public boolean isTable() {
 		return getTable() != null;
 	}
+
+	@Override
+	public String toString() {
+		return "Element [groupId=" + groupId + ", element=" + element + "]";
+	}
 }
