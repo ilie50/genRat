@@ -3,20 +3,22 @@ package org.genrat.word.model;
 import java.io.Serializable;
 import java.util.UUID;
 
-import org.apache.poi.xwpf.usermodel.IBodyElement;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
-import org.apache.poi.xwpf.usermodel.XWPFTable;
+import org.apache.poi.xwpf.usermodel.XWPFTableRow;
+import org.genrat.tags.model.TagType;
 
 public class Element implements Serializable {
 
 	private static final long serialVersionUID = -3312870307384700467L;
 	
 	private UUID groupId;
-	private IBodyElement element;
+	private Object element;
+	private TagType tagType;
 	
-	public Element(IBodyElement element, UUID groupId) {
+	public Element(Object element, UUID groupId, TagType tagType) {
 		this.element = element;
 		this.groupId = groupId;
+		this.tagType = tagType;
 	}
 
 	public UUID getGroupId() {
@@ -27,11 +29,11 @@ public class Element implements Serializable {
 		this.groupId = groupId;
 	}
 
-	public IBodyElement getElement() {
+	public Object getElement() {
 		return element;
 	}
 
-	public void setElement(IBodyElement element) {
+	public void setElement(Object element) {
 		this.element = element;
 	}
 	public XWPFParagraph getParagraph() {
@@ -42,22 +44,37 @@ public class Element implements Serializable {
 		return null;
 	}
 	
-	public XWPFTable getTable() {
-		if (element instanceof XWPFTable) {
-			return (XWPFTable) element;
+	public XWPFTableRow getTableRow() {
+		if (element instanceof XWPFTableRow) {
+			return (XWPFTableRow) element;
 			
 		}
 		return null;
 	}
 
+	public boolean isDirectiveStartTag() {
+		return TagType.DIRECTIVE_START.equals(tagType);
+	}
+	
+	public boolean isDirectiveEndTag() {
+		return TagType.DIRECTIVE_END.equals(tagType);
+	}
+	
+	public boolean isExpressionTag() {
+		return TagType.EXPRESSION.equals(tagType);
+	}
+
+	public boolean isDirectiveClauseTag() {
+		return TagType.DIRECTIVE_CLAUSE.equals(tagType);
+	}
+	
 	public boolean isParagraph() {
 		return getParagraph() != null;
 	}
 
-	public boolean isTable() {
-		return getTable() != null;
+	public boolean isTableRow() {
+		return getTableRow() != null;
 	}
-
 	@Override
 	public String toString() {
 		return "Element [groupId=" + groupId + ", element=" + element + "]";
