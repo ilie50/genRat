@@ -18,9 +18,9 @@ import org.genrat.word.DocxToPdfGeneratorService;
 public class Main {
 
 //	public static final String DOCX_INPUT_PATH = "C:\\tmp\\gr\\RemoteDebugginSetup.docx";
-//	public static final String DOCX_INPUT_PATH = "C:\\Users\\ibratilescu\\Documents\\TestDocument.docx";
+	public static final String DOCX_INPUT_PATH = "C:\\Users\\ibratilescu\\Documents\\TestDocument.docx";
 //	public static final String DOCX_INPUT_PATH = "C:\\Users\\ibratilescu\\Documents\\TableDocument.docx";
-	public static final String DOCX_INPUT_PATH = "C:\\Users\\ibratilescu\\Documents\\TableDocument2.docx";
+//	public static final String DOCX_INPUT_PATH = "C:\\Users\\ibratilescu\\Documents\\TableDocument2.docx";
 	public static final String PDF_OUTPUT_PATH = "C:\\tmp\\gr\\pdf\\";
 
 	public static void main(String[] args) {

@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -72,7 +73,8 @@ public class DocProcessor {
 	}
 
 
-	private Map<UUID, XWPFTable> tableMap = new LinkedHashMap<>();
+	//private Map<UUID, XWPFTable> tableMap = new LinkedHashMap<>();
+	private Map<XWPFTable, XWPFTable> tableMap = new LinkedHashMap<>();
 	
 	public void applyData(Serializable data) throws XmlException, IOException {
 		List<String> list = processTemplate(data);
@@ -91,20 +93,25 @@ public class DocProcessor {
 			if (element.isParagraph()) {
 				XmlCursor cursor = findCursor(element);
 				XWPFParagraph xwpfParagraph = element.getParagraph();
+				
 				XWPFParagraph newParagraph = document.insertNewParagraph(cursor);
 				cloneParagraph(newParagraph, xwpfParagraph);
 				newElement = newParagraph;
+				tableMap.clear();
 			} else if (element.isTableRow()) {
 				XmlCursor cursor = findCursor(element);
 				XWPFTableRow tableRow = element.getTableRow();
-				XWPFTable newTable = tableMap.get(element.getGroupId() != null ? element.getGroupId() : elementUuid);
+
+				//XWPFTable newTable = tableMap.get(element.getGroupId() != null ? element.getGroupId() : elementUuid);
+				XWPFTable newTable = tableMap.get(tableRow.getTable());
 				XWPFTableRow newTableRow = null;
 				if (newTable == null) {
 					newTable = document.insertNewTbl(cursor);
 					newTable.getCTTbl().setTblPr(tableRow.getTable().getCTTbl().getTblPr());
 					newTable.getCTTbl().setTblGrid(tableRow.getTable().getCTTbl().getTblGrid());
 
-					tableMap.put(element.getGroupId() != null ? element.getGroupId() : elementUuid, newTable);
+					//tableMap.put(element.getGroupId() != null ? element.getGroupId() : elementUuid, newTable);
+					tableMap.put(tableRow.getTable(), newTable);
 					newTableRow = newTable.getRow(0);
 				} else {
 					newTableRow = newTable.createRow();
@@ -198,8 +205,13 @@ public class DocProcessor {
 	}
 
 	private XmlCursor findCursor(Element currentElement) {
+		if (currentElement.isTableRow()) {
+			System.out.println("debug");
+		}
 		UUID groupId = currentElement.getGroupId();
 		XmlCursor cursor = null;
+		String text = getText(currentElement.getElement());
+		System.out.println("GroupId: " + currentElement.getGroupId() + "; Text: " + text);
 		if (groupId == null) {
 			if (currentElement.isParagraph()) {
 				cursor = currentElement.getParagraph().getCTP().newCursor();			
@@ -208,23 +220,29 @@ public class DocProcessor {
 			}
 			return cursor;
 		}
-		int pos = 0;
-		IBodyElement nextBodyElement = null;
-		if (currentElement.isParagraph()) {
-			pos = document.getPosOfParagraph(currentElement.getParagraph());
-			nextBodyElement = currentElement.getParagraph();
-			
-		} else if (currentElement.isTableRow()) {
-			pos = document.getPosOfTable(currentElement.getTableRow().getTable());
-			nextBodyElement = currentElement.getTableRow().getTable();
+		boolean found = false;
+		List<Element> subElements = allElements.subList(allElements.indexOf(currentElement), allElements.size());
+		Element lastElement = null;
+		for (Element element : subElements) {
+			if (currentElement.getGroups().contains(element.getGroupId())) {
+				found = true;
+			} else if (found) {
+				lastElement = element;
+				found = false;
+			}
 		}
-		if (document.getBodyElements().size() > pos + 1) {
-			nextBodyElement = document.getBodyElements().get(pos + 1);
-		}
-		if (nextBodyElement instanceof XWPFParagraph) {
-			cursor = ((XWPFParagraph) nextBodyElement).getCTP().newCursor();			
-		} else if (nextBodyElement instanceof XWPFTable) {
-			cursor = ((XWPFTable) nextBodyElement).getCTTbl().newCursor();
+		if (lastElement != null) {
+			if (lastElement.isParagraph()) {
+				cursor = lastElement.getParagraph().getCTP().newCursor();			
+			} else if (lastElement.isTableRow()) {
+				cursor = lastElement.getTableRow().getTable().getCTTbl().newCursor();
+			}
+		} else {
+			if (currentElement.isParagraph()) {
+				cursor = currentElement.getParagraph().getCTP().newCursor();			
+			} else if (currentElement.isTableRow()) {
+				cursor = currentElement.getTableRow().getTable().getCTTbl().newCursor();
+			}
 		}
 		return cursor;
 	}
@@ -287,9 +305,11 @@ public class DocProcessor {
 		}
 	}
 	
-	private void processElement(Object element) {
+	private List<Element> allElements = new ArrayList<>();
+	
+	private void processElement(Object bodyElement) {
 		Map<UUID, Tag> map = new LinkedHashMap<>();
-		List<XWPFRun> runs = getRuns(element);
+		List<XWPFRun> runs = getRuns(bodyElement);
 		List<Run> runList = new ArrayList<>();
 		String builtText = "";
 		int position = 0;
@@ -301,7 +321,8 @@ public class DocProcessor {
 		}
 		UUID elementUuid = UUID.randomUUID();
 		elementRunList.put(elementUuid, runList);
-		String text = getText(element);
+		String text = getText(bodyElement);
+		String originalText = text;
 		String delimiter = "";
 		TagType tagType = null;
 		if (!template.toString().isEmpty()) {
@@ -318,6 +339,8 @@ public class DocProcessor {
 			inTagCounter--;
 			tagType = TagType.DIRECTIVE_END;
 		}
+		Element element = new Element(bodyElement, stack.isEmpty() ? null : stack.peek(), tagType, new HashSet<>(stack));
+		allElements.add(element);
 		if (tagFinder.isTag(text) || inTagCounter > 0) {
 			List<Tag> tags = tagFinder.getTagValues(text);
 			template.append(delimiter);
@@ -340,13 +363,13 @@ public class DocProcessor {
 				text = text.substring(startIndex + tagContent.length());
 			}
 			allMap.put(elementUuid, map);
-			elementMap.put(elementUuid, new Element(element, stack.isEmpty() ? null : stack.peek(), tagType));
+			elementMap.put(elementUuid, element);
 		}
-		if (tagFinder.isDirectiveStartTag(text) && tagFinder.isDirectiveEndTag(text)) {
+		if (tagFinder.isDirectiveStartTag(originalText) && tagFinder.isDirectiveEndTag(originalText)) {
 			stack.pop();
 		}
 	}
-	
+
 	private List<XWPFRun> getRuns(Object element) {
 		if (element instanceof XWPFParagraph) {
 			XWPFParagraph paragraph = (XWPFParagraph) element;

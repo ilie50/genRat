@@ -1,6 +1,7 @@
 package org.genrat.word.model;
 
 import java.io.Serializable;
+import java.util.Set;
 import java.util.UUID;
 
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
@@ -14,11 +15,13 @@ public class Element implements Serializable {
 	private UUID groupId;
 	private Object element;
 	private TagType tagType;
+	private Set<UUID> groups;
 	
-	public Element(Object element, UUID groupId, TagType tagType) {
+	public Element(Object element, UUID groupId, TagType tagType, Set<UUID> groups) {
 		this.element = element;
 		this.groupId = groupId;
 		this.tagType = tagType;
+		this.groups = groups;
 	}
 
 	public UUID getGroupId() {
@@ -36,6 +39,15 @@ public class Element implements Serializable {
 	public void setElement(Object element) {
 		this.element = element;
 	}
+	
+	public Set<UUID> getGroups() {
+		return groups;
+	}
+
+	public void setGroups(Set<UUID> groups) {
+		this.groups = groups;
+	}
+
 	public XWPFParagraph getParagraph() {
 		if (element instanceof XWPFParagraph) {
 			return (XWPFParagraph) element;
@@ -75,8 +87,10 @@ public class Element implements Serializable {
 	public boolean isTableRow() {
 		return getTableRow() != null;
 	}
+
 	@Override
 	public String toString() {
-		return "Element [groupId=" + groupId + ", element=" + element + "]";
+		return "Element [groupId=" + groupId + ", element=" + element + ", tagType=" + tagType + ", groups="
+				+ groups + "]";
 	}
 }
