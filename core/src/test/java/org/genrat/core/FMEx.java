@@ -27,7 +27,7 @@ public class FMEx {
         cfg.setTemplateExceptionHandler(TemplateExceptionHandler.RETHROW_HANDLER);
         
         Template template = cfg.getTemplate("helloworld.ftl");
-
+        template.getName();
 		NodeModel.parse(new File("C:\\tmp\\gr\\xml\\employees.xml"));
 	}
 }

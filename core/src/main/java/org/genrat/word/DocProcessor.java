@@ -73,7 +73,6 @@ public class DocProcessor {
 	}
 
 
-	//private Map<UUID, XWPFTable> tableMap = new LinkedHashMap<>();
 	private Map<XWPFTable, XWPFTable> tableMap = new LinkedHashMap<>();
 	
 	public void applyData(Serializable data) throws XmlException, IOException {
@@ -102,7 +101,6 @@ public class DocProcessor {
 				XmlCursor cursor = findCursor(element);
 				XWPFTableRow tableRow = element.getTableRow();
 
-				//XWPFTable newTable = tableMap.get(element.getGroupId() != null ? element.getGroupId() : elementUuid);
 				XWPFTable newTable = tableMap.get(tableRow.getTable());
 				XWPFTableRow newTableRow = null;
 				if (newTable == null) {
@@ -110,7 +108,6 @@ public class DocProcessor {
 					newTable.getCTTbl().setTblPr(tableRow.getTable().getCTTbl().getTblPr());
 					newTable.getCTTbl().setTblGrid(tableRow.getTable().getCTTbl().getTblGrid());
 
-					//tableMap.put(element.getGroupId() != null ? element.getGroupId() : elementUuid, newTable);
 					tableMap.put(tableRow.getTable(), newTable);
 					newTableRow = newTable.getRow(0);
 				} else {
@@ -205,13 +202,8 @@ public class DocProcessor {
 	}
 
 	private XmlCursor findCursor(Element currentElement) {
-		if (currentElement.isTableRow()) {
-			System.out.println("debug");
-		}
 		UUID groupId = currentElement.getGroupId();
 		XmlCursor cursor = null;
-		String text = getText(currentElement.getElement());
-		System.out.println("GroupId: " + currentElement.getGroupId() + "; Text: " + text);
 		if (groupId == null) {
 			if (currentElement.isParagraph()) {
 				cursor = currentElement.getParagraph().getCTP().newCursor();			
